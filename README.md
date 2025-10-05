@@ -1,62 +1,141 @@
-# 🎬 WatchWise  
-### _Your AI-Powered Movie Tracker & Social Review Platform_
+🎬 WatchWise
+Your Personal Movie Tracker & Social Review Platform
 
-![Next.js](https://img.shields.io/badge/Next.js-15.5.4-black?logo=nextdotjs)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green?logo=supabase)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v3.4-blue?logo=tailwindcss)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
----
 
-## 🌟 Overview
 
-**WatchWise** is a full-stack web app that lets users track what they watch, discover new films, and connect with other movie lovers.  
-It uses **AI-powered recommendations**, **Supabase authentication**, and a sleek **Next.js + Tailwind** interface to make your watchlist more intelligent and social.  
 
-> Built for cinephiles who love discovering, rating, and discussing movies — all in one place.
 
----
 
-## 🚀 Features
 
-- 🎥 **Smart Movie Recommendations** — AI-powered suggestions based on your favorites, ratings, and reviews.  
-- ⭐ **Personal Library** — Track watchlist and completed movies, leave ratings, and write detailed reviews.  
-- 💬 **Social Feed** — Discover other users’ reviews, comment, and react with emojis.  
-- 🧠 **AI-Driven Suggestions** — Recommends trending titles if user data is limited.  
-- 🔍 **Advanced Search & Filters** — Search movies by title, genre, or keywords with intelligent filters.  
-- 👤 **Profile Customization** — Update your username, upload an avatar, and manage account settings.  
-- 🌗 **Light/Dark Mode** — Seamless theme toggle for better viewing comfort.  
-- 🔐 **Secure Authentication** — Email-based sign-in powered by Supabase Auth.  
+🌟 Overview
 
----
+WatchWise is a full-stack web app that helps users track, review, and discover movies.
+It features user authentication, personal watchlists, ratings, reviews, and a social feed where users can interact through comments and emoji reactions.
 
-## 🛠️ Tech Stack
+Built for movie fans who want one simple place to organize what they watch and connect with others.
 
-| Layer | Technology |
-|-------|-------------|
-| **Frontend** | Next.js 15 (App Router), React, Tailwind CSS |
-| **Backend** | Supabase (PostgreSQL, Auth, Storage) |
-| **API** | TMDB (The Movie Database) |
-| **Auth** | Supabase Magic Link / Email Auth |
-| **Hosting** | Vercel + Supabase Cloud |
-| **Language** | TypeScript |
+🚀 Features
 
----
+🎥 Movie Tracking — Add movies to your watchlist or mark them as completed.
 
-## 🧩 Database Schema (Simplified)
+⭐ Ratings & Reviews — Rate movies out of 10 and share your opinions.
 
-**Tables:**
-- `profiles` — user info, avatar, username  
-- `items` — movie metadata (title, TMDB ID, poster, etc.)  
-- `user_items` — connects users to movies (watchlist, completed, reviews, ratings, favorites)  
-- `reactions` — emoji reactions to reviews  
-- `comments` — user comments on reviews  
+💬 Social Feed — View, comment, and react to other users’ reviews.
 
----
+❤️ Emoji Reactions — Express how you feel about a review with one click.
 
-## 🧑‍💻 Local Development Setup
+🔍 Search & Filters — Search movies by title or keywords, and filter results by genre.
 
-### 1️⃣ Clone the Repository
-```bash
+👤 User Profiles — Customize your username and profile avatar.
+
+📚 Library Tabs — Easily view your watchlist or completed movies.
+
+🌗 Light/Dark Mode — Switch themes for comfortable viewing.
+
+🔐 Authentication — Secure email-based login via Supabase Auth.
+
+🛠️ Tech Stack
+Layer	Technology
+Frontend	Next.js 15 (App Router), React, Tailwind CSS
+Backend	Supabase (PostgreSQL, Auth, Storage)
+API	TMDB (The Movie Database)
+Auth	Supabase Magic Link / Email Auth
+Hosting	Vercel + Supabase Cloud
+Language	TypeScript
+🧩 Database Schema (Simplified)
+
+Tables:
+
+profiles — User info, avatar, username
+
+items — Movie metadata (title, TMDB ID, poster, genre)
+
+user_items — Links users to movies (watchlist, completed, ratings, reviews)
+
+reactions — Emoji reactions on reviews
+
+comments — User comments on reviews
+
+🧑‍💻 Local Development Setup
+1️⃣ Clone the Repository
 git clone https://github.com/<your-username>/watchwise.git
 cd watchwise
+
+2️⃣ Install Dependencies
+npm install
+
+3️⃣ Configure Environment Variables
+
+Create a .env.local file in your project root:
+
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
+NEXT_PUBLIC_TMDB_API_KEY=<your-tmdb-api-key>
+
+4️⃣ Run the Dev Server
+npm run dev
+
+
+Then open http://localhost:3000
+
+🧱 Project Structure
+src/
+├── app/
+│   ├── page.tsx              # Home Page (Recommendations)
+│   ├── feed/page.tsx         # Social Feed
+│   ├── library/page.tsx      # Watchlist & Completed Tabs
+│   ├── profile/page.tsx      # User Profile & Settings
+│   ├── search/page.tsx       # Search Page with Filters
+│   └── api/                  # API Routes (Supabase + TMDB)
+├── components/
+│   ├── ItemCard.tsx
+│   ├── AuthButton.tsx
+│   ├── ThemeToggle.tsx
+│   └── NavBar.tsx
+├── lib/
+│   └── supabase/
+│       ├── client.ts
+│       └── server.ts
+└── styles/
+    └── globals.css
+
+🧭 Future Improvements
+
+👥 Follow / Friend system
+
+🗓️ “Currently Watching” category
+
+🎞️ Support for TV shows and anime
+
+📈 Activity statistics (ratings history, most-watched genres)
+
+🧩 Optional AI-powered recommendations (future-ready, free-tier friendly)
+
+🏗️ Deployment
+
+Deployed easily with Vercel — connect your GitHub repo and add your Supabase + TMDB API keys as environment variables in the dashboard.
+
+⚖️ License
+
+This project is licensed under the MIT License
+.
+
+💬 Acknowledgements
+
+Supabase
+ — Auth, DB, and Storage
+
+TMDB
+ — Movie Data API
+
+Next.js
+ — Full-stack React Framework
+
+Tailwind CSS
+ — Styling Framework
+
+⭐ Support
+
+If you like WatchWise, please consider giving it a ⭐ on GitHub to support continued development!
