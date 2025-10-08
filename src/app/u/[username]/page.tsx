@@ -1,144 +1,145 @@
-import { supabaseServer } from "@/lib/supabase/server";
-import ItemCard, { Item } from "@/components/ItemCard";
-import Image from "next/image";
+// src/app/u/[username]/page.tsx
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-function normalize<T extends Record<string, any> | null | undefined>(x: T | T[]): Record<string, any> | null {
-  if (!x) return null;
-  return Array.isArray(x) ? (x[0] ?? null) : (x as any);
+import { supabaseServer } from '@/lib/supabase/server';
+import ItemCard, { Item } from '@/components/ItemCard';
+import Link from 'next/link';
+
+type ParamsPromise = Promise<{ username: string }>;
+
+function normalizeItem<T extends Record<string, any> | null | undefined>(
+  item: T | T[]
+): (Record<string, any> & {
+  id?: number;
+  tmdb_id?: number;
+  media_type?: string;
+  title?: string;
+  poster_path?: string | null;
+  release_date?: string | null;
+  genres?: number[] | null;
+}) | null {
+  if (!item) return null;
+  return Array.isArray(item) ? (item[0] ?? null) : (item as any);
 }
 
-type Row = {
-  status: "watchlist" | "completed";
+type PublicRow = {
+  status: 'watchlist' | 'completed';
   favorite: boolean;
   rating: number | null;
   review: string | null;
-  updated_at: string;
   item: Item;
+  updated_at?: string;
 };
 
-export default async function PublicProfile({
+export default async function PublicProfilePage({
   params,
 }: {
-  params: { username: string };
+  params: ParamsPromise;
 }) {
+  const { username } = await params;
+
   const supabase = await supabaseServer();
 
-  // Find the profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, username, avatar_url")
-    .eq("username", params.username)
+  // fetch profile by username
+  const { data: prof, error: profErr } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .eq('username', username)
     .maybeSingle();
 
-  if (!profile) {
+  if (profErr) {
     return (
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Not found</h1>
-        <p className="opacity-70">No user with that username.</p>
+      <div className="space-y-3">
+        <h1 className="text-2xl font-semibold">User</h1>
+        <p className="text-sm text-red-600">Error: {profErr.message}</p>
       </div>
     );
   }
 
-  // Pull recent items for this user
-  const { data } = await supabase
-    .from("user_items")
+  if (!prof) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-2xl font-semibold">User</h1>
+        <p className="opacity-70">No user found for “{username}”.</p>
+        <Link className="underline" href="/">
+          Go home
+        </Link>
+      </div>
+    );
+  }
+
+  // recent activity for this user
+  const { data, error } = await supabase
+    .from('user_items')
     .select(
-      "status, favorite, rating, review, updated_at, item:items(id, tmdb_id, media_type, title, poster_path, release_date, genres)"
+      'status, favorite, rating, review, updated_at, item:items(id, tmdb_id, media_type, title, poster_path, release_date, genres)'
     )
-    .eq("user_id", profile.id)
-    .order("updated_at", { ascending: false })
-    .limit(200);
+    .eq('user_id', prof.id)
+    .order('updated_at', { ascending: false })
+    .limit(40);
 
-  const rows: Row[] =
-    (data ?? [])
-      .map((r: any) => {
-        const it = normalize(r.item);
-        if (!it) return null;
-        const item: Item = {
-          id: Number(it.id),
-          tmdb_id: it.tmdb_id ? Number(it.tmdb_id) : undefined,
-          media_type: (it.media_type ?? "movie") as Item["media_type"],
-          title: it.title ?? "Untitled",
-          poster_path: (it.poster_path ?? null) as string | null,
-          release_date: (it.release_date ?? null) as string | null,
-          genres: (it.genres ?? null) as number[] | null,
-        };
-        return {
-          status: r.status === "completed" ? "completed" : "watchlist",
-          favorite: !!r.favorite,
-          rating: r.rating ?? null,
-          review: r.review ?? null,
-          updated_at: String(r.updated_at),
-          item,
-        } as Row;
-      })
-      .filter(Boolean) as Row[];
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-2xl font-semibold">{prof.username}</h1>
+        <p className="text-sm text-red-600">Error: {error.message}</p>
+      </div>
+    );
+  }
 
-  const favorites = rows.filter((r) => r.favorite).slice(0, 12);
-  const latestReviews = rows.filter((r) => (r.review?.trim().length ?? 0) > 0).slice(0, 6);
-  const recentlyCompleted = rows.filter((r) => r.status === "completed").slice(0, 12);
+  const rows: PublicRow[] = (data ?? [])
+    .map((r: any) => {
+      const it = normalizeItem(r.item);
+      if (!it) return null;
+      const item: Item = {
+        id: Number(it.id),
+        tmdb_id: it.tmdb_id ? Number(it.tmdb_id) : undefined,
+        media_type: (it.media_type ?? 'movie') as Item['media_type'],
+        title: it.title ?? 'Untitled',
+        poster_path: (it.poster_path ?? null) as string | null,
+        release_date: (it.release_date ?? null) as string | null,
+        genres: (it.genres ?? null) as number[] | null,
+      };
+      return {
+        status: r.status === 'completed' ? 'completed' : 'watchlist',
+        favorite: !!r.favorite,
+        rating: r.rating ?? null,
+        review: r.review ?? null,
+        updated_at: r.updated_at ?? null,
+        item,
+      } as PublicRow;
+    })
+    .filter(Boolean) as PublicRow[];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        {profile.avatar_url ? (
-          <Image
-            src={profile.avatar_url}
-            alt={profile.username}
-            width={48}
-            height={48}
-            className="h-12 w-12 rounded-full object-cover"
-          />
-        ) : (
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-zinc-200 text-sm dark:bg-zinc-800">
-            {profile.username.slice(0, 1).toUpperCase()}
-          </div>
-        )}
-        <h1 className="text-2xl font-semibold">@{profile.username}</h1>
-      </div>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">@{prof.username}</h1>
+          <p className="text-sm opacity-70">Recent activity · {rows.length} items</p>
+        </div>
+      </header>
 
-      {/* Favorites */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Favorites</h2>
-        {favorites.length === 0 ? (
-          <p className="opacity-70">No favorites yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {favorites.map((r) => (
-              <ItemCard key={`fav-${r.item.id}`} item={r.item} initialStatus={{ favorite: true, status: r.status, rating: r.rating, review: r.review }} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Latest Reviews */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Latest reviews</h2>
-        {latestReviews.length === 0 ? (
-          <p className="opacity-70">No reviews yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {latestReviews.map((r) => (
-              <ItemCard key={`rev-${r.item.id}-${r.updated_at}`} item={r.item} initialStatus={{ status: r.status, rating: r.rating, review: r.review, favorite: r.favorite }} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Recently Completed */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Recently completed</h2>
-        {recentlyCompleted.length === 0 ? (
-          <p className="opacity-70">No completed titles yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {recentlyCompleted.map((r) => (
-              <ItemCard key={`comp-${r.item.id}-${r.updated_at}`} item={r.item} initialStatus={{ status: "completed", favorite: r.favorite, rating: r.rating, review: r.review }} />
-            ))}
-          </div>
-        )}
-      </section>
+      {rows.length === 0 ? (
+        <p className="opacity-70">No public activity yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {rows.map((ui) => (
+            <ItemCard
+              key={`${ui.item.media_type}-${ui.item.id}`}
+              item={ui.item}
+              initialStatus={{
+                // ❗️No `item` here — only fields defined in UserItemStatus
+                status: ui.status,
+                favorite: ui.favorite,
+                rating: ui.rating,
+                review: ui.review,
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
