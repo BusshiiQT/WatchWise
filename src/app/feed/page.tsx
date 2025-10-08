@@ -1,5 +1,5 @@
 'use client';
-
+export const dynamic = 'force-dynamic'; // always SSR
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
