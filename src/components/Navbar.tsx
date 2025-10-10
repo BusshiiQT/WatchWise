@@ -1,31 +1,38 @@
+// src/components/Navbar.tsx
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { supabaseBrowser } from '@/lib/supabase/client';
+import { useEffect, useMemo, useState } from 'react';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const supabase = supabaseBrowser();
+    let mounted = true;
 
-    const init = async () => {
-      const { data } = await supabase.auth.getUser();
+    // prime auth state
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
       setUser(data.user ?? null);
-    };
-    init();
+    });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+    // subscribe to auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!mounted) return;
       setUser(session?.user ?? null);
     });
 
-    return () => sub.subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      listener.subscription?.unsubscribe();
+    };
+  }, [supabase]);
 
   const links = [
     { name: 'Home', href: '/' },
@@ -63,7 +70,6 @@ export default function Navbar() {
             variant="outline"
             className="border-zinc-600 text-sm text-zinc-200 hover:bg-zinc-800"
             onClick={async () => {
-              const supabase = supabaseBrowser();
               await supabase.auth.signOut();
               window.location.href = '/';
             }}

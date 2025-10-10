@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { supabaseBrowser } from '@/lib/supabase/client';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import Rating10 from '@/components/Rating10';
 
@@ -62,7 +62,7 @@ function tmdbPoster(
 
 export default function TitlePage() {
   const { type, tmdb_id } = useParams<{ type: string; tmdb_id: string }>();
-  const supabase = useMemo(() => supabaseBrowser(), []);
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
   const [details, setDetails] = useState<TitleDetails | null>(null);
 
   // user & item

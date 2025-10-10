@@ -1,28 +1,27 @@
+// src/app/api/reactions/route.ts
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { getSupabaseServer } from '@/lib/supabase/server';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { user_item_id, emoji } = body || {};
-    if (!user_item_id || !emoji) return NextResponse.json({ ok: false }, { status: 400 });
+    const { user_item_id, emoji } = (await req.json().catch(() => ({}))) as {
+      user_item_id?: string | number;
+      emoji?: string;
+    };
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-        },
-      }
-    );
+    if (!user_item_id || !emoji) {
+      return NextResponse.json({ ok: false }, { status: 400 });
+    }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+    const supabase = await getSupabaseServer();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ ok: false }, { status: 401 });
+    }
 
     const { error } = await supabase.from('reactions').insert({
       user_id: user.id,
@@ -36,7 +35,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

@@ -1,9 +1,11 @@
+// src/app/feed/page.tsx
 'use client';
-export const dynamic = 'force-dynamic'; // always SSR
+export const dynamic = 'force-dynamic'; // keep SSR for up-to-date feed
+
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { supabaseBrowser } from '@/lib/supabase/client';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
 type FeedItem = {
@@ -15,15 +17,15 @@ type FeedItem = {
   items: { title: string; poster_path: string | null; media_type: string; tmdb_id?: number };
 };
 
-function tmdbPoster(path?: string | null, size: 'w342'|'w500'|'w780'|'original' = 'w342') {
+function tmdbPoster(path?: string | null, size: 'w342' | 'w500' | 'w780' | 'original' = 'w342') {
   if (!path) return null;
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
-const EMOJIS = ['👍','❤️','😂','🤯','😢'];
+const EMOJIS = ['👍', '❤️', '😂', '🤯', '😢'];
 
 export default function FeedPage() {
-  const supabase = useMemo(() => supabaseBrowser(), []);
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [reactions, setReactions] = useState<Record<string, Record<string, number>>>({});
@@ -34,14 +36,16 @@ export default function FeedPage() {
       try {
         const { data, error } = await supabase
           .from('user_items')
-          .select(`
+          .select(
+            `
             id,
             rating,
             review,
             updated_at,
             profiles(username, avatar_url),
             items(title, poster_path, media_type, tmdb_id)
-          `)
+          `
+          )
           .not('review', 'is', null)
           .order('updated_at', { ascending: false })
           .limit(40);
@@ -59,7 +63,7 @@ export default function FeedPage() {
 
         setFeed(rows);
 
-        // load reaction counts
+        // load reaction counts + comment counts
         const ids = rows.map((r) => r.id);
         if (ids.length) {
           const { data: rx } = await supabase
@@ -91,7 +95,9 @@ export default function FeedPage() {
   }, [supabase]);
 
   async function react(userItemId: string, emoji: string) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return alert('Sign in to react.');
 
     // optimistic update
@@ -112,7 +118,9 @@ export default function FeedPage() {
     const text = prompt('Write a comment:')?.trim();
     if (!text) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return alert('Sign in to comment.');
 
     // optimistic count
@@ -129,7 +137,9 @@ export default function FeedPage() {
     <div className="max-w-3xl mx-auto py-10 px-4">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">🎬 Community Feed</h1>
-        <Link href="/profile"><Button variant="outline">Profile</Button></Link>
+        <Link href="/profile">
+          <Button variant="outline">Profile</Button>
+        </Link>
       </div>
 
       {loading ? (
@@ -144,10 +154,19 @@ export default function FeedPage() {
             const cmCount = commentsCount[item.id] || 0;
 
             return (
-              <div key={item.id} className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 flex gap-4">
+              <div
+                key={item.id}
+                className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 flex gap-4"
+              >
                 <div className="flex-shrink-0">
                   {poster ? (
-                    <Image src={poster} alt={item.items.title} width={92} height={138} className="rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800" />
+                    <Image
+                      src={poster}
+                      alt={item.items.title}
+                      width={92}
+                      height={138}
+                      className="rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800"
+                    />
                   ) : (
                     <div className="w-[92px] h-[138px] rounded-lg bg-zinc-200 dark:bg-zinc-800" />
                   )}
@@ -157,7 +176,9 @@ export default function FeedPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800" />
                     <span className="font-medium">{item.profiles.username}</span>
-                    <span className="text-xs opacity-60">{new Date(item.updated_at).toLocaleDateString()}</span>
+                    <span className="text-xs opacity-60">
+                      {new Date(item.updated_at).toLocaleDateString()}
+                    </span>
                   </div>
 
                   <h2 className="font-semibold text-lg">{item.items.title}</h2>
@@ -169,8 +190,13 @@ export default function FeedPage() {
                   )}
 
                   <div className="mt-3 flex items-center gap-2">
-                    <Link href={`/title/${item.items.media_type}/${item.items.tmdb_id ?? ''}`} prefetch={false}>
-                      <Button size="sm" variant="outline">View Details</Button>
+                    <Link
+                      href={`/title/${item.items.media_type}/${item.items.tmdb_id ?? ''}`}
+                      prefetch={false}
+                    >
+                      <Button size="sm" variant="outline">
+                        View Details
+                      </Button>
                     </Link>
 
                     <div className="ml-2 flex items-center gap-1">

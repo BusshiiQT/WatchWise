@@ -1,18 +1,19 @@
-"use client";
+// src/components/ItemCard.tsx
+'use client';
 
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/client";
-import RatingStars from "./RatingStars";
-import CategoryToggles from "./CategoryToggles";
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
+import RatingStars from './RatingStars';
+import CategoryToggles from './CategoryToggles';
 
-export type MediaType = "movie" | "tv" | "book";
+export type MediaType = 'movie' | 'tv' | 'book';
 
 export type Item = {
-  id?: number;          // items.id (if known)
-  tmdb_id?: number;     // TMDb id (for movie/tv)
+  id?: number; // items.id (if known)
+  tmdb_id?: number; // TMDb id (for movie/tv)
   media_type: MediaType;
   title: string;
   overview?: string | null;
@@ -22,7 +23,7 @@ export type Item = {
 };
 
 type UserItemStatus = {
-  status: "watchlist" | "completed";
+  status: 'watchlist' | 'completed';
   favorite: boolean;
   rating: number | null;
   review: string | null;
@@ -35,17 +36,17 @@ type Props = {
 };
 
 export default function ItemCard({ item, initialStatus, showControls = true }: Props) {
-  const supabase = supabaseBrowser();
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
   const pathname = usePathname();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [dbItemId, setDbItemId] = useState<number | null>(item.id ?? null);
 
   const [hasEntry, setHasEntry] = useState<boolean>(!!initialStatus);
-  const [status, setStatus] = useState<"watchlist" | "completed">(initialStatus?.status ?? "watchlist");
+  const [status, setStatus] = useState<'watchlist' | 'completed'>(initialStatus?.status ?? 'watchlist');
   const [favorite, setFavorite] = useState<boolean>(initialStatus?.favorite ?? false);
   const [rating, setRating] = useState<number | null>(initialStatus?.rating ?? null);
-  const [review, setReview] = useState<string>(initialStatus?.review ?? "");
+  const [review, setReview] = useState<string>(initialStatus?.review ?? '');
   const [saving, setSaving] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -55,7 +56,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
   );
 
   const detailHref =
-    item.tmdb_id && (item.media_type === "movie" || item.media_type === "tv")
+    item.tmdb_id && (item.media_type === 'movie' || item.media_type === 'tv')
       ? `/title/${item.media_type}/${item.tmdb_id}`
       : undefined;
 
@@ -79,10 +80,10 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
     if (dbItemId) return dbItemId;
     if (item.tmdb_id) {
       const { data: existing, error: qErr } = await supabase
-        .from("items")
-        .select("id")
-        .eq("tmdb_id", item.tmdb_id)
-        .eq("media_type", item.media_type)
+        .from('items')
+        .select('id')
+        .eq('tmdb_id', item.tmdb_id)
+        .eq('media_type', item.media_type)
         .maybeSingle();
       if (qErr) {
         console.error(qErr);
@@ -96,7 +97,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
     }
 
     const { data: inserted, error: insErr } = await supabase
-      .from("items")
+      .from('items')
       .insert({
         tmdb_id: item.tmdb_id ?? null,
         media_type: item.media_type,
@@ -106,7 +107,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
         release_date: item.release_date ?? null,
         genres: item.genres ?? null,
       })
-      .select("id")
+      .select('id')
       .single();
 
     if (insErr) {
@@ -130,10 +131,10 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
         if (!itemId) return;
       }
       const { data, error } = await supabase
-        .from("user_items")
-        .select("status, favorite, rating, review")
-        .eq("user_id", userId)
-        .eq("item_id", itemId)
+        .from('user_items')
+        .select('status, favorite, rating, review')
+        .eq('user_id', userId)
+        .eq('item_id', itemId)
         .maybeSingle();
 
       if (!mounted) return;
@@ -143,10 +144,10 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       }
       if (data) {
         setHasEntry(true);
-        setStatus(data.status === "completed" ? "completed" : "watchlist");
+        setStatus(data.status === 'completed' ? 'completed' : 'watchlist');
         setFavorite(!!data.favorite);
         setRating(data.rating ?? null);
-        setReview(data.review ?? "");
+        setReview(data.review ?? '');
       } else {
         setHasEntry(false);
       }
@@ -159,10 +160,15 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
 
   // 3) Upsert helper
   async function upsertUserItem(
-    patch: Partial<{ status: "watchlist" | "completed"; favorite: boolean; rating: number | null; review: string | null }>
+    patch: Partial<{
+      status: 'watchlist' | 'completed';
+      favorite: boolean;
+      rating: number | null;
+      review: string | null;
+    }>
   ) {
     if (!userId) {
-      alert("Sign in first");
+      alert('Sign in first');
       return;
     }
     setSaving(true);
@@ -182,7 +188,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       ...patch,
     };
 
-    const { error } = await supabase.from("user_items").upsert(payload, { onConflict: "user_id,item_id" });
+    const { error } = await supabase.from('user_items').upsert(payload, { onConflict: 'user_id,item_id' });
     setSaving(false);
     if (error) {
       console.error(error);
@@ -190,10 +196,10 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       return;
     }
 
-    if (typeof patch.status !== "undefined") setStatus(patch.status);
-    if (typeof patch.favorite !== "undefined") setFavorite(patch.favorite);
-    if (typeof patch.rating !== "undefined") setRating(patch.rating);
-    if (typeof patch.review !== "undefined") setReview(patch.review ?? "");
+    if (typeof patch.status !== 'undefined') setStatus(patch.status);
+    if (typeof patch.favorite !== 'undefined') setFavorite(patch.favorite);
+    if (typeof patch.rating !== 'undefined') setRating(patch.rating);
+    if (typeof patch.review !== 'undefined') setReview(patch.review ?? '');
     setHasEntry(true);
   }
 
@@ -203,7 +209,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
 
   async function removeFromLibrary() {
     if (!userId) {
-      alert("Sign in first");
+      alert('Sign in first');
       return;
     }
     setSaving(true);
@@ -212,7 +218,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       setSaving(false);
       return;
     }
-    const { error } = await supabase.from("user_items").delete().eq("user_id", userId).eq("item_id", itemId);
+    const { error } = await supabase.from('user_items').delete().eq('user_id', userId).eq('item_id', itemId);
     setSaving(false);
     if (error) {
       console.error(error);
@@ -222,9 +228,9 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
     setHasEntry(false);
     setFavorite(false);
     setRating(null);
-    setReview("");
-    setStatus("watchlist");
-    if (pathname?.startsWith("/library")) {
+    setReview('');
+    setStatus('watchlist');
+    if (pathname?.startsWith('/library')) {
       location.reload();
     }
   }
@@ -300,8 +306,8 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
               <CategoryToggles
                 status={status}
                 favorite={favorite}
-                onToggleWatchlist={() => upsertUserItem({ status: "watchlist" })}
-                onToggleCompleted={() => upsertUserItem({ status: "completed" })}
+                onToggleWatchlist={() => upsertUserItem({ status: 'watchlist' })}
+                onToggleCompleted={() => upsertUserItem({ status: 'completed' })}
                 onToggleFavorite={() => upsertUserItem({ favorite: !favorite })}
               />
 
@@ -321,7 +327,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
           ) : (
             <div className="pt-1">
               <button
-                onClick={() => upsertUserItem({ status: "watchlist" })}
+                onClick={() => upsertUserItem({ status: 'watchlist' })}
                 className="rounded-full bg-zinc-900 px-3 py-1.5 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
                 aria-label="Add to watchlist"
                 title="Add to watchlist"

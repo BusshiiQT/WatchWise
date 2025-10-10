@@ -1,29 +1,17 @@
+// src/app/api/account/delete/route.ts
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { getSupabaseServer } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
   try {
-    const { confirm } = await req.json().catch(() => ({}));
+    const { confirm } = (await req.json().catch(() => ({}))) as { confirm?: string };
     if (confirm !== 'DELETE MY ACCOUNT') {
       return new NextResponse('Bad confirm phrase', { status: 400 });
     }
 
-    // 1) Get current user via cookie-based client
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-        },
-      }
-    );
-
+    // 1) Get current user via cookie-based server client
+    const supabase = await getSupabaseServer();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -33,14 +21,13 @@ export async function POST(req: Request) {
     }
 
     // 2) Clean user-owned rows first (avoid orphaned FKs)
-    // (Assumes user_items.user_id -> profiles.id; profiles.id = auth.users.id)
     await supabase.from('user_items').delete().eq('user_id', user.id);
     await supabase.from('profiles').delete().eq('id', user.id);
 
-    // 3) Delete Auth user with service role
+    // 3) Delete Auth user with service role (server-only key — NOT NEXT_PUBLIC)
     const admin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!, // server-only
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { persistSession: false } }
     );
 
@@ -50,7 +37,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return new NextResponse('Unexpected error: ' + (e?.message ?? 'unknown'), { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    return new NextResponse('Unexpected error: ' + msg, { status: 500 });
   }
 }

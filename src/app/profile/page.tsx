@@ -1,8 +1,9 @@
+// src/app/profile/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { supabaseBrowser } from '@/lib/supabase/client';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
 type Profile = {
@@ -13,7 +14,7 @@ type Profile = {
 };
 
 export default function ProfilePage() {
-  const supabase = useMemo(() => supabaseBrowser(), []);
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

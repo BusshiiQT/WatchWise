@@ -1,8 +1,9 @@
+// src/app/auth/callback/AuthCallbackClient.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { supabaseBrowser } from '@/lib/supabase/client';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
 
 export default function AuthCallbackClient() {
   const searchParams = useSearchParams();
@@ -11,8 +12,9 @@ export default function AuthCallbackClient() {
   const [detail, setDetail] = useState<string>('');
 
   useEffect(() => {
+    const supabase = getSupabaseBrowser();
+
     const run = async () => {
-      const code = searchParams.get('code');
       const error =
         searchParams.get('error_description') || searchParams.get('error');
 
@@ -22,19 +24,16 @@ export default function AuthCallbackClient() {
         return;
       }
 
-      if (!code) {
-        setMsg('error');
-        setDetail('Missing code. Please open the magic link on this device.');
-        return;
-      }
+      // If we have a `code` in the URL, this is an OAuth/OTP callback.
+      const code = searchParams.get('code');
 
       try {
-        const supabase = supabaseBrowser();
-        const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-        if (exErr) {
-          setMsg('error');
-          setDetail(exErr.message);
-          return;
+        if (code) {
+          // Supabase v2: finalize session from the full URL
+          await supabase.auth.exchangeCodeForSession(window.location.href);
+        } else {
+          // No code: ensure we have (or don't have) a session
+          await supabase.auth.getSession();
         }
 
         setMsg('ok');
@@ -42,9 +41,11 @@ export default function AuthCallbackClient() {
         const redirectTo = sessionStorage.getItem('postAuthRedirect') || '/';
         sessionStorage.removeItem('postAuthRedirect');
         router.replace(redirectTo);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const message =
+          e instanceof Error ? e.message : 'Unknown authentication error';
         setMsg('error');
-        setDetail(e?.message ?? 'Unknown error');
+        setDetail(message);
       }
     };
 

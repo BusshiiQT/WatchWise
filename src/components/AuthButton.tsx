@@ -1,40 +1,51 @@
-"use client";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabase/client";
+// src/components/AuthButton.tsx
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/button';
 
 export default function AuthButton() {
-  const supabase = supabaseBrowser();
-  const [signedIn, setSignedIn] = useState(false);
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const run = async () => {
-      const { data } = await supabase.auth.getUser();
-      setSignedIn(!!data.user);
+    let mounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      setUser(data.user ?? null);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!mounted) return;
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription?.unsubscribe();
     };
-    run();
   }, [supabase]);
 
-  if (signedIn) {
+  if (!user) {
     return (
-      <button
-        onClick={async () => {
-          await supabase.auth.signOut();
-          location.reload();
-        }}
-        className="rounded-md bg-zinc-900 px-3 py-1.5 text-white dark:bg-zinc-100 dark:text-zinc-900"
-      >
-        Sign out
-      </button>
+      <a href="/signin">
+        <Button className="bg-yellow-500 text-black hover:bg-yellow-400">Sign In</Button>
+      </a>
     );
   }
 
   return (
-    <Link
-      href="/signin"
-      className="rounded-md bg-zinc-900 px-3 py-1.5 text-white dark:bg-zinc-100 dark:text-zinc-900"
+    <Button
+      variant="outline"
+      className="border-zinc-600 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      onClick={async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/';
+      }}
     >
-      Sign in
-    </Link>
+      Sign Out
+    </Button>
   );
 }

@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase/server";
+// src/app/api/feed/route.ts
+import { NextResponse } from 'next/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 
 /**
  * GET /api/feed?cursor=ISO&limit=20
@@ -7,19 +8,20 @@ import { supabaseServer } from "@/lib/supabase/server";
  * Cursor = ISO string for ui.updated_at; we fetch rows strictly older than it.
  */
 export async function GET(req: Request) {
-  const supabase = await supabaseServer();
+  const supabase = await getSupabaseServer();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { searchParams } = new URL(req.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 50);
-  const cursor = searchParams.get("cursor"); // ISO date string
+  const limitParam = searchParams.get('limit') || '20';
+  const limit = Math.min(parseInt(limitParam, 10) || 20, 50);
+  const cursor = searchParams.get('cursor'); // ISO date string
 
   // Build base query
   let query = supabase
-    .from("user_items")
+    .from('user_items')
     .select(
       `
       user_id,
@@ -46,10 +48,10 @@ export async function GET(req: Request) {
 
   if (cursor) {
     // Only older than cursor
-    query = query.lt("updated_at", cursor);
+    query = query.lt('updated_at', cursor);
   }
 
-  query = query.order("updated_at", { ascending: false }).limit(limit + 1);
+  query = query.order('updated_at', { ascending: false }).limit(limit + 1);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -59,9 +61,10 @@ export async function GET(req: Request) {
   // If signed in, filter out muted users and hidden items
   if (user) {
     const [{ data: mutes }, { data: hidden }] = await Promise.all([
-      supabase.from("muted_users").select("muted_user_id").eq("user_id", user.id),
-      supabase.from("hidden").select("item_id").eq("user_id", user.id),
+      supabase.from('muted_users').select('muted_user_id').eq('user_id', user.id),
+      supabase.from('hidden').select('item_id').eq('user_id', user.id),
     ]);
+
     const mutedSet = new Set((mutes ?? []).map((m: any) => String(m.muted_user_id)));
     const hiddenSet = new Set((hidden ?? []).map((h: any) => Number(h.item_id)));
 

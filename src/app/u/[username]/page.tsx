@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-import { supabaseServer } from '@/lib/supabase/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 import ItemCard, { Item } from '@/components/ItemCard';
 import Link from 'next/link';
 
@@ -39,7 +39,7 @@ export default async function PublicProfilePage({
 }) {
   const { username } = await params;
 
-  const supabase = await supabaseServer();
+  const supabase = await getSupabaseServer();
 
   // fetch profile by username
   const { data: prof, error: profErr } = await supabase
@@ -130,7 +130,7 @@ export default async function PublicProfilePage({
               key={`${ui.item.media_type}-${ui.item.id}`}
               item={ui.item}
               initialStatus={{
-                // ❗️No `item` here — only fields defined in UserItemStatus
+                // No `item` here — only fields defined in UserItemStatus
                 status: ui.status,
                 favorite: ui.favorite,
                 rating: ui.rating,

@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-import { supabaseServer } from '@/lib/supabase/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 import ItemCard, { Item } from '@/components/ItemCard';
 import Link from 'next/link';
 import AuthButton from '@/components/AuthButton';
@@ -79,7 +79,7 @@ function SubTab({
   );
 }
 
-// IMPORTANT: Next 15 expects searchParams to be a Promise in types
+// Next 15 typing for searchParams
 type SPromise = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function LibraryPage({
@@ -88,15 +88,15 @@ export default async function LibraryPage({
   searchParams: SPromise;
 }) {
   const raw = await searchParams;
-  const filter = ((typeof raw?.filter === 'string'
-    ? raw.filter
-    : 'watchlist') as 'watchlist' | 'completed' | 'favorites' | 'all');
+  const filter = ((
+    typeof raw?.filter === 'string' ? raw.filter : 'watchlist'
+  ) as 'watchlist' | 'completed' | 'favorites' | 'all');
 
-  const type = ((typeof raw?.type === 'string'
-    ? raw.type
-    : 'all') as 'all' | 'movie' | 'tv');
+  const type = ((
+    typeof raw?.type === 'string' ? raw.type : 'all'
+  ) as 'all' | 'movie' | 'tv');
 
-  const supabase = await supabaseServer();
+  const supabase = await getSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();

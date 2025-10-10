@@ -1,16 +1,17 @@
-"use client";
+// src/app/signin/page.tsx
+'use client';
 
-import { useState } from "react";
-import { supabaseBrowser } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useState } from 'react';
+import { getSupabaseBrowser } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
 export default function SignInPage() {
-  const supabase = supabaseBrowser();
+  const supabase = getSupabaseBrowser();
   const router = useRouter();
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -23,54 +24,44 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      if (mode === "signin") {
+      if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
         if (error) throw error;
-        // good -> go home & refresh
-        router.replace("/");
-        // give the cookie a tick to persist, then refresh RSC data
+        router.replace('/');
         setTimeout(() => window.location.reload(), 50);
         return;
       }
 
-      // --- SIGN UP path ---
-      const { data, error } = await supabase.auth.signUp({
+      // --- SIGN UP ---
+      const { error } = await supabase.auth.signUp({
         email,
         password: pw,
-        // keep redirect if you later enable confirm-emails (optional)
         options: { emailRedirectTo: `${location.origin}/auth/callback` },
       });
       if (error) throw error;
 
-      // If your project auto-confirms emails, a session may already exist.
-      // If not, sign-in will work immediately ONLY if confirmations are disabled.
-      // Try to sign in right away (best UX for dev / non-confirmed flows):
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email,
         password: pw,
       });
 
       if (!signInErr) {
-        router.replace("/");
+        router.replace('/');
         setTimeout(() => window.location.reload(), 50);
         return;
       }
 
-      // If we get here, sign-in failed most likely due to "Email not confirmed"
-      // Show helpful guidance instead of quietly redirecting.
       const needsConfirm =
-        signInErr.message?.toLowerCase().includes("email not confirmed") ||
-        signInErr.message?.toLowerCase().includes("invalid login credentials");
+        signInErr.message?.toLowerCase().includes('email not confirmed') ||
+        signInErr.message?.toLowerCase().includes('invalid login credentials');
 
       if (needsConfirm) {
-        setInfo(
-          "Account created. Please confirm your email, then return here to sign in."
-        );
+        setInfo('Account created. Please confirm your email, then return here to sign in.');
       } else {
         setErr(signInErr.message);
       }
     } catch (e: any) {
-      setErr(e?.message ?? "Authentication failed");
+      setErr(e?.message ?? 'Authentication failed');
     } finally {
       setLoading(false);
     }
@@ -79,13 +70,12 @@ export default function SignInPage() {
   async function signInWithGoogle() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider: 'google',
         options: { redirectTo: `${location.origin}/auth/callback` },
       });
       if (error) throw error;
-      // redirect happens automatically
     } catch (e: any) {
-      setErr(e?.message ?? "Google sign-in failed (check Supabase OAuth settings)");
+      setErr(e?.message ?? 'Google sign-in failed (check Supabase OAuth settings)');
     }
   }
 
@@ -96,23 +86,23 @@ export default function SignInPage() {
       {/* Tabs */}
       <div className="flex gap-2">
         <button
-          onClick={() => setMode("signin")}
+          onClick={() => setMode('signin')}
           className={
-            "rounded-full px-3 py-1 text-sm " +
-            (mode === "signin"
-              ? "bg-rose-600 text-white"
-              : "bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700")
+            'rounded-full px-3 py-1 text-sm ' +
+            (mode === 'signin'
+              ? 'bg-rose-600 text-white'
+              : 'bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700')
           }
         >
           Sign in
         </button>
         <button
-          onClick={() => setMode("signup")}
+          onClick={() => setMode('signup')}
           className={
-            "rounded-full px-3 py-1 text-sm " +
-            (mode === "signup"
-              ? "bg-rose-600 text-white"
-              : "bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700")
+            'rounded-full px-3 py-1 text-sm ' +
+            (mode === 'signup'
+              ? 'bg-rose-600 text-white'
+              : 'bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700')
           }
         >
           Create account
@@ -136,7 +126,7 @@ export default function SignInPage() {
           <label className="text-sm">Password</label>
           <div className="flex gap-2">
             <input
-              type={showPw ? "text" : "password"}
+              type={showPw ? 'text' : 'password'}
               required
               minLength={6}
               value={pw}
@@ -149,12 +139,10 @@ export default function SignInPage() {
               onClick={() => setShowPw((s) => !s)}
               className="h-10 rounded-md border border-zinc-300 px-3 text-sm dark:border-zinc-700"
             >
-              {showPw ? "Hide" : "Show"}
+              {showPw ? 'Hide' : 'Show'}
             </button>
           </div>
-          {mode === "signup" && (
-            <p className="text-xs opacity-70">Use at least 6 characters.</p>
-          )}
+          {mode === 'signup' && <p className="text-xs opacity-70">Use at least 6 characters.</p>}
         </div>
 
         {err && <p className="text-sm text-red-600">{err}</p>}
@@ -165,13 +153,7 @@ export default function SignInPage() {
           disabled={loading}
           className="h-10 w-full rounded-md bg-zinc-900 text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
         >
-          {loading
-            ? mode === "signin"
-              ? "Signing in…"
-              : "Creating account…"
-            : mode === "signin"
-              ? "Sign in"
-              : "Create account"}
+          {loading ? (mode === 'signin' ? 'Signing in…' : 'Creating account…') : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
 
         <div className="text-center text-xs opacity-70">or</div>
