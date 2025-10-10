@@ -1,64 +1,66 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 
-type Theme = 'system' | 'light' | 'dark';
+type Mode = 'system' | 'light' | 'dark';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('system');
+  const [mode, setMode] = useState<Mode>('system');
 
+  // hydrate current mode
   useEffect(() => {
-    try {
-      const saved = (localStorage.getItem('st_theme') as Theme) || 'system';
-      setTheme(saved);
-      applyTheme(saved);
-    } catch {}
+    const stored = (localStorage.getItem('ww_theme') as Mode) || 'system';
+    setMode(stored);
+    apply(stored);
   }, []);
 
-  function applyTheme(next: Theme) {
-    const root = document.documentElement;
-    if (next === 'system') {
-      root.removeAttribute('data-theme');
+  function apply(next: Mode) {
+    const html = document.documentElement;
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const useDark = next === 'dark' || (next === 'system' && prefersDark);
+
+    if (useDark) {
+      html.classList.add('dark');
+      html.style.colorScheme = 'dark';
     } else {
-      root.setAttribute('data-theme', next);
+      html.classList.remove('dark');
+      if (next === 'light') {
+        html.style.colorScheme = 'light';
+      } else {
+        html.style.removeProperty('color-scheme');
+      }
     }
   }
 
-  function setAndApply(next: Theme) {
-    setTheme(next);
-    try {
-      localStorage.setItem('st_theme', next);
-    } catch {}
-    applyTheme(next);
+  function setTheme(next: Mode) {
+    localStorage.setItem('ww_theme', next);
+    setMode(next);
+    apply(next);
   }
 
   return (
     <div className="flex items-center gap-1">
-      <Button
-        variant={theme === 'system' ? 'default' : 'outline'}
-        size="sm"
-        onClick={() => setAndApply('system')}
-        title="Use system theme"
+      <button
+        className={`rounded-md px-2 py-1 text-xs border ${mode==='system' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'border-zinc-300 dark:border-zinc-700'}`}
+        onClick={() => setTheme('system')}
+        title="System"
       >
-        System
-      </Button>
-      <Button
-        variant={theme === 'light' ? 'default' : 'outline'}
-        size="sm"
-        onClick={() => setAndApply('light')}
-        title="Light theme"
+        Sys
+      </button>
+      <button
+        className={`rounded-md px-2 py-1 text-xs border ${mode==='light' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'border-zinc-300 dark:border-zinc-700'}`}
+        onClick={() => setTheme('light')}
+        title="Light"
       >
         Light
-      </Button>
-      <Button
-        variant={theme === 'dark' ? 'default' : 'outline'}
-        size="sm"
-        onClick={() => setAndApply('dark')}
-        title="Dark theme"
+      </button>
+      <button
+        className={`rounded-md px-2 py-1 text-xs border ${mode==='dark' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'border-zinc-300 dark:border-zinc-700'}`}
+        onClick={() => setTheme('dark')}
+        title="Dark"
       >
         Dark
-      </Button>
+      </button>
     </div>
   );
 }

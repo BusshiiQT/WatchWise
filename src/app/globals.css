@@ -1,7 +1,14 @@
+/* Tailwind v4 core */
 @import "tailwindcss";
 
-/* Light/Dark surface tweaks */
-:root { color-scheme: light dark; }
+/* Enable class-based dark mode for `dark:` utilities */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light/Dark surface tweaks (optional but nice) */
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+
+/* Page base */
 html, body { height: 100%; }
 
 /* Card hover microinteraction */

@@ -1,32 +1,47 @@
-import type { Metadata } from 'next';
+// src/app/layout.tsx
 import './globals.css';
+import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 
 export const metadata: Metadata = {
   title: 'WatchWise',
-  description: 'Track movies and TV shows, powered by Supabase + TMDB',
+  description: 'Track movies & TV with Supabase + TMDB',
 };
 
-const themeInit = `
-  try {
-    const saved = localStorage.getItem('st_theme') || 'system';
-    const root = document.documentElement;
-    if (saved === 'system') {
-      root.removeAttribute('data-theme');
-    } else {
-      root.setAttribute('data-theme', saved);
-    }
-  } catch {}
-`;
+// Inline script to set dark mode ASAP (prevents flash)
+function ThemeScript() {
+  const js = `
+    (function () {
+      try {
+        var stored = localStorage.getItem('ww_theme') || 'system';
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var useDark = stored === 'dark' || (stored === 'system' && prefersDark);
+        var html = document.documentElement;
+
+        if (useDark) {
+          html.classList.add('dark');
+          html.style.colorScheme = 'dark';
+        } else {
+          html.classList.remove('dark');
+          if (stored === 'light') {
+            html.style.colorScheme = 'light';
+          } else {
+            html.style.removeProperty('color-scheme');
+          }
+        }
+      } catch (_) {}
+    })();
+  `;
+  return <script dangerouslySetInnerHTML={{ __html: js }} />;
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Ensure theme is applied before paint to avoid flash */}
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <ThemeScript />
       </head>
-      <body className="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+      <body className="min-h-dvh bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
         <Navbar />
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       </body>
