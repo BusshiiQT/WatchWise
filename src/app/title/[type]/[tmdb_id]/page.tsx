@@ -32,7 +32,7 @@ type ReviewRow = {
 };
 
 type Review = {
-  id: number; // real bigint from DB
+  id: number;
   rating: number | null;
   review: string | null;
   updated_at: string;
@@ -48,7 +48,7 @@ type Comment = {
   profiles: { username: string; avatar_url: string | null } | null;
 };
 
-type ReactionCounts = Record<string, number>; // emoji -> count
+type ReactionCounts = Record<string, number>;
 
 const EMOJIS = ['👍', '❤️', '😂', '🤯', '😢'];
 
@@ -80,11 +80,11 @@ export default function TitlePage() {
   const [loadingSocial, setLoadingSocial] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
-  const [reactions, setReactions] = useState<Record<number, ReactionCounts>>({}); // by user_item_id
+  const [reactions, setReactions] = useState<Record<number, ReactionCounts>>({});
 
   const numericTmdbId = Number(tmdb_id);
 
-  // TMDb details
+  // TMDb details (client side)
   useEffect(() => {
     (async () => {
       try {
@@ -121,7 +121,7 @@ export default function TitlePage() {
       setSignedIn(!!user);
 
       if (user) {
-        // ensure profile
+        // ensure profile exists
         const { data: prof } = await supabase
           .from('profiles')
           .select('id')
@@ -141,7 +141,7 @@ export default function TitlePage() {
         .from('items')
         .select('id')
         .eq('media_type', type)
-        .or(`tmdb_id.eq.${String(numericTmdbId)},tmdb_id.eq.${numericTmdbId}`)
+        .eq('tmdb_id', numericTmdbId)
         .maybeSingle();
 
       let id = it?.id as number | undefined;
@@ -149,7 +149,7 @@ export default function TitlePage() {
         const { data: inserted } = await supabase
           .from('items')
           .insert({
-            tmdb_id: String(numericTmdbId),
+            tmdb_id: numericTmdbId,
             media_type: type,
             title: details.title || details.name || 'Untitled',
             poster_path: details.poster_path ?? null,
@@ -222,7 +222,7 @@ export default function TitlePage() {
           });
           setReactions(rxMap);
 
-          // comments (list per user_item)
+          // comments
           const { data: cms } = await supabase
             .from('comments')
             .select('id, user_item_id, content, created_at, profiles(username, avatar_url)')
@@ -253,26 +253,42 @@ export default function TitlePage() {
     [supabase, itemId]
   );
 
-  // initial social load
   useEffect(() => {
     loadSocial();
   }, [loadSocial]);
 
   const poster = tmdbPoster(details?.poster_path, 'w500');
 
-  // actions
+  // === Actions ===
   async function toggleWatchlist() {
     if (!signedIn || !itemId) return alert('Please sign in first.');
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const newStatus = inWatchlist ? null : 'watchlist';
-      const { error } = await supabase
-        .from('user_items')
-        .upsert({ user_id: user.id, item_id: itemId, status: newStatus }, { onConflict: 'user_id,item_id' });
-      if (!error) setInWatchlist(!inWatchlist);
+      if (inWatchlist) {
+        // ❌ remove the row (mirrors ItemCard behavior so untoggle works)
+        const { error } = await supabase
+          .from('user_items')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('item_id', itemId);
+        if (!error) {
+          setInWatchlist(false);
+          setFavorite(false); // optional: reset local toggles
+          setRating(null);
+          setReview('');
+        }
+      } else {
+        // ✅ add to watchlist
+        const { error } = await supabase
+          .from('user_items')
+          .upsert({ user_id: user.id, item_id: itemId, status: 'watchlist' }, { onConflict: 'user_id,item_id' });
+        if (!error) setInWatchlist(true);
+      }
     } finally {
       setSaving(false);
     }
@@ -282,7 +298,9 @@ export default function TitlePage() {
     if (!signedIn || !itemId) return alert('Please sign in first.');
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { error } = await supabase
         .from('user_items')
@@ -297,26 +315,23 @@ export default function TitlePage() {
     if (!signedIn || !itemId) return alert('Please sign in first.');
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const clean = review.trim() || null;
 
-      // ✅ Upsert and SELECT the real row to get the numeric id
-      const { data: up, error } = await supabase
+      const { error } = await supabase
         .from('user_items')
         .upsert(
           { user_id: user.id, item_id: itemId, rating: rating ?? null, review: clean },
           { onConflict: 'user_id,item_id' }
-        )
-        .select('id') // <-- get the actual bigint id
-        .single();
+        );
 
       if (error) {
         alert('Failed to save review: ' + error.message);
         return;
       }
-
-      // ✅ Now reload the social data so every review has a real numeric id
       await loadSocial();
     } finally {
       setSaving(false);
@@ -324,56 +339,54 @@ export default function TitlePage() {
   }
 
   async function reactTo(userItemId: number, emoji: string) {
-  if (!Number.isFinite(userItemId)) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return alert('Please sign in to react.');
+    if (!Number.isFinite(userItemId)) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return alert('Please sign in to react.');
 
-  // See if this user already reacted with this emoji
-  const { data: existing } = await supabase
-    .from('reactions')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('user_item_id', userItemId)
-    .eq('emoji', emoji)
-    .maybeSingle();
+    const { data: existing } = await supabase
+      .from('reactions')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('user_item_id', userItemId)
+      .eq('emoji', emoji)
+      .maybeSingle();
 
-  if (existing) {
-    // remove reaction
-    await supabase.from('reactions').delete().eq('id', existing.id);
-    setReactions((prev) => {
-      const cur = { ...(prev[userItemId] || {}) };
-      cur[emoji] = Math.max(0, (cur[emoji] || 1) - 1);
-      return { ...prev, [userItemId]: cur };
-    });
-  } else {
-    // add new reaction
-    const { error } = await supabase.from('reactions').insert({
-      user_id: user.id,
-      user_item_id: userItemId,
-      emoji: String(emoji).slice(0, 8),
-    });
-
-    if (!error) {
+    if (existing) {
+      await supabase.from('reactions').delete().eq('id', existing.id);
       setReactions((prev) => {
         const cur = { ...(prev[userItemId] || {}) };
-        cur[emoji] = (cur[emoji] || 0) + 1;
+        cur[emoji] = Math.max(0, (cur[emoji] || 1) - 1);
         return { ...prev, [userItemId]: cur };
       });
     } else {
-      console.error('Reaction insert failed:', error.message);
+      const { error } = await supabase.from('reactions').insert({
+        user_id: user.id,
+        user_item_id: userItemId,
+        emoji: String(emoji).slice(0, 8),
+      });
+      if (!error) {
+        setReactions((prev) => {
+          const cur = { ...(prev[userItemId] || {}) };
+          cur[emoji] = (cur[emoji] || 0) + 1;
+          return { ...prev, [userItemId]: cur };
+        });
+      } else {
+        console.error('Reaction insert failed:', error.message);
+      }
     }
   }
-}
-
 
   async function addComment(userItemId: number) {
-    if (!Number.isFinite(userItemId)) return; // guard
+    if (!Number.isFinite(userItemId)) return;
     const text = prompt('Write a comment:')?.trim();
     if (!text) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return alert('Please sign in to comment.');
 
-    // optimistic
     const optimistic: Comment = {
       id: Math.floor(Math.random() * 1e9),
       user_item_id: userItemId,
@@ -389,7 +402,6 @@ export default function TitlePage() {
       content: text.slice(0, 1000),
     });
     if (error) {
-      // rollback
       setComments((p) => ({
         ...p,
         [userItemId]: (p[userItemId] || []).filter((c) => c.id !== optimistic.id),

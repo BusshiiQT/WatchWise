@@ -1,4 +1,3 @@
-// src/components/ItemCard.tsx
 'use client';
 
 import Image from 'next/image';
@@ -12,8 +11,8 @@ import CategoryToggles from './CategoryToggles';
 export type MediaType = 'movie' | 'tv' | 'book';
 
 export type Item = {
-  id?: number; // items.id (if known)
-  tmdb_id?: number; // TMDb id (for movie/tv)
+  id?: number;
+  tmdb_id?: number;
   media_type: MediaType;
   title: string;
   overview?: string | null;
@@ -36,7 +35,7 @@ type Props = {
 };
 
 export default function ItemCard({ item, initialStatus, showControls = true }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowser(), []);
+  const supabase = getSupabaseBrowser();
   const pathname = usePathname();
 
   const [userId, setUserId] = useState<string | null>(null);
@@ -63,21 +62,21 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
   // 1) Get current user
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
+    (async () => {
       const { data } = await supabase.auth.getUser();
       if (!mounted) return;
       setUserId(data.user?.id ?? null);
       setAuthChecked(true);
-    };
-    load();
+    })();
     return () => {
       mounted = false;
     };
   }, [supabase]);
 
-  // Helper: find or create items.id for this card
+  // Ensure items.id exists for this card
   async function ensureItemRow(): Promise<number | null> {
     if (dbItemId) return dbItemId;
+
     if (item.tmdb_id) {
       const { data: existing, error: qErr } = await supabase
         .from('items')
@@ -86,7 +85,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
         .eq('media_type', item.media_type)
         .maybeSingle();
       if (qErr) {
-        console.error(qErr);
+        console.error('items lookup error:', qErr);
         alert(qErr.message);
         return null;
       }
@@ -111,7 +110,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       .single();
 
     if (insErr) {
-      console.error(insErr);
+      console.error('items insert error:', insErr);
       alert(insErr.message);
       return null;
     }
@@ -120,16 +119,14 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
     return inserted.id as number;
   }
 
-  // 2) Hydrate from DB so state persists across navigation
+  // Hydrate from DB so state persists
   useEffect(() => {
     let mounted = true;
-    const hydrate = async () => {
+    (async () => {
       if (!userId) return;
-      let itemId = dbItemId;
-      if (!itemId) {
-        itemId = await ensureItemRow();
-        if (!itemId) return;
-      }
+      let itemId = dbItemId ?? (await ensureItemRow());
+      if (!itemId) return;
+
       const { data, error } = await supabase
         .from('user_items')
         .select('status, favorite, rating, review')
@@ -139,7 +136,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
 
       if (!mounted) return;
       if (error) {
-        console.error(error);
+        console.error('user_items select error:', error);
         return;
       }
       if (data) {
@@ -151,21 +148,16 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       } else {
         setHasEntry(false);
       }
-    };
-    hydrate();
+    })();
+
     return () => {
       mounted = false;
     };
   }, [userId, dbItemId]); // eslint-disable-line
 
-  // 3) Upsert helper
+  // Upsert helper
   async function upsertUserItem(
-    patch: Partial<{
-      status: 'watchlist' | 'completed';
-      favorite: boolean;
-      rating: number | null;
-      review: string | null;
-    }>
+    patch: Partial<{ status: 'watchlist' | 'completed'; favorite: boolean; rating: number | null; review: string | null }>
   ) {
     if (!userId) {
       alert('Sign in first');
@@ -191,7 +183,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
     const { error } = await supabase.from('user_items').upsert(payload, { onConflict: 'user_id,item_id' });
     setSaving(false);
     if (error) {
-      console.error(error);
+      console.error('user_items upsert error:', error);
       alert(error.message);
       return;
     }
@@ -218,20 +210,67 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       setSaving(false);
       return;
     }
-    const { error } = await supabase.from('user_items').delete().eq('user_id', userId).eq('item_id', itemId);
-    setSaving(false);
-    if (error) {
-      console.error(error);
-      alert(error.message);
-      return;
-    }
+
+    // optimistic UI (feels snappy even if network is slow)
+    const prev = { hasEntry, favorite, rating, review, status };
     setHasEntry(false);
     setFavorite(false);
     setRating(null);
     setReview('');
     setStatus('watchlist');
+
+    const { error: delErr } = await supabase
+      .from('user_items')
+      .delete()
+      .eq('user_id', userId)
+      .eq('item_id', itemId);
+
+    if (delErr) {
+      // revert optimistic UI
+      setHasEntry(prev.hasEntry);
+      setFavorite(prev.favorite);
+      setRating(prev.rating);
+      setReview(prev.review ?? '');
+      setStatus(prev.status);
+
+      console.error('user_items DELETE failed:', delErr);
+      alert(
+        `Delete failed: ${delErr.message}\n\nIf this mentions RLS/policy, add the DELETE policy for user_items (auth.uid() = user_id).`
+      );
+      setSaving(false);
+      return;
+    }
+
+    // sanity re-check
+    const { data: stillThere, error: recheckErr } = await supabase
+      .from('user_items')
+      .select('item_id')
+      .eq('user_id', userId)
+      .eq('item_id', itemId)
+      .maybeSingle();
+
+    if (recheckErr) {
+      console.warn('recheck after delete error:', recheckErr);
+    }
+    if (stillThere) {
+      alert(
+        'Row still present after delete. This usually means your Supabase DELETE policy is missing.\n\nAdd the policy: user_items DELETE where auth.uid() = user_id.'
+      );
+    }
+
+    setSaving(false);
+
     if (pathname?.startsWith('/library')) {
       location.reload();
+    }
+  }
+
+  // Clicking “Watchlist” again should remove the row
+  async function handleToggleWatchlist() {
+    if (hasEntry && status === 'watchlist') {
+      await removeFromLibrary();
+    } else {
+      await upsertUserItem({ status: 'watchlist' });
     }
   }
 
@@ -242,27 +281,13 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
       {img ? (
         detailHref ? (
           <Link href={detailHref} className="shrink-0">
-            <Image
-              src={img}
-              alt={item.title}
-              width={92}
-              height={138}
-              className="h-[138px] w-[92px] rounded-md object-cover"
-            />
+            <Image src={img} alt={item.title} width={92} height={138} className="h-[138px] w-[92px] rounded-md object-cover" />
           </Link>
         ) : (
-          <Image
-            src={img}
-            alt={item.title}
-            width={92}
-            height={138}
-            className="h-[138px] w-[92px] rounded-md object-cover"
-          />
+          <Image src={img} alt={item.title} width={92} height={138} className="h-[138px] w-[92px] rounded-md object-cover" />
         )
       ) : (
-        <div className="grid h-[138px] w-[92px] place-items-center rounded-md bg-zinc-200 text-xs dark:bg-zinc-800">
-          No image
-        </div>
+        <div className="grid h-[138px] w-[92px] place-items-center rounded-md bg-zinc-200 text-xs dark:bg-zinc-800">No image</div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -306,7 +331,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
               <CategoryToggles
                 status={status}
                 favorite={favorite}
-                onToggleWatchlist={() => upsertUserItem({ status: 'watchlist' })}
+                onToggleWatchlist={handleToggleWatchlist}
                 onToggleCompleted={() => upsertUserItem({ status: 'completed' })}
                 onToggleFavorite={() => upsertUserItem({ favorite: !favorite })}
               />
@@ -327,7 +352,7 @@ export default function ItemCard({ item, initialStatus, showControls = true }: P
           ) : (
             <div className="pt-1">
               <button
-                onClick={() => upsertUserItem({ status: 'watchlist' })}
+                onClick={handleToggleWatchlist}
                 className="rounded-full bg-zinc-900 px-3 py-1.5 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
                 aria-label="Add to watchlist"
                 title="Add to watchlist"
